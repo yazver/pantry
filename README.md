@@ -1,0 +1,2 @@
+# pantry
+Golang config library.
