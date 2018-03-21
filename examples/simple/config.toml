@@ -1,0 +1,23 @@
+Age = 25
+DescriptionTag = true
+ExpandedTags = true
+Cats = [ "Cauchy", "Plato" ]
+Pi = 3.14
+Perfection = [ 6, 28, 496, 8128 ]
+DOB = 1987-07-05T05:45:00Z
+
+[[Sub]]
+#Weight = 100
+Height = 200
+[[Sub]]
+Height = 100
+[[Sub]]
+Height = 300
+
+[SubMap.1]
+#Weight = 100
+Height = 200
+[SubMap.2]
+Height = 100
+[SubMap.4]
+Height = 300

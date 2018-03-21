@@ -4,29 +4,32 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
+
+	"context"
+	"net/http"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-// File
+// Box
 type Box interface {
 	Path() string
+	Format() string
 	Get() ([]byte, error)
 	Set(data []byte) error
 	Watch(task func(err error)) error
-	UnWatch()
+	WatchContext(ctx context.Context, task func(err error)) error
 }
 
 type BaseBox struct {
 	path string
 }
 
-// Ext returns the file name extension used by path.
+// Format returns the file name extension used by path.
 // The extension is the suffix beginning after the final dot
 // in the final slash-separated element of path;
 // it is empty if there is no dot.
-func (bb *BaseBox) Ext() string {
+func (bb *BaseBox) Format() string {
 	return ext(bb.path)
 }
 
@@ -37,12 +40,12 @@ func (bb *BaseBox) Path() string {
 // FileBox
 type FileBox struct {
 	BaseBox
-	lock      sync.Mutex
-	watchDone chan struct{}
+	//lock      sync.Mutex
+	//watchDone chan struct{}
 }
 
-func NewFileBox(path string) Box {
-	return &FileBox{BaseBox: BaseBox{path}}
+func NewFileBox(path string) *FileBox {
+	return &FileBox{BaseBox: BaseBox{filepath.Clean(path)}}
 }
 
 func (fb *FileBox) Get() ([]byte, error) {
@@ -50,13 +53,18 @@ func (fb *FileBox) Get() ([]byte, error) {
 }
 
 func (fb *FileBox) Set(data []byte) error {
+	if path := filepath.Dir(fb.path); !pathExists(path) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
 	return ioutil.WriteFile(fb.path, data, os.ModePerm)
 }
 
 func (fb *FileBox) Watch(task func(err error)) error {
-	fb.lock.Lock()
-	defer fb.lock.Unlock()
-	fb.UnWatch()
+	return fb.WatchContext(context.Background(), task)
+}
+func (fb *FileBox) WatchContext(ctx context.Context, task func(err error)) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -68,13 +76,13 @@ func (fb *FileBox) Watch(task func(err error)) error {
 	}
 
 	done := make(chan struct{})
-	fb.watchDone = done
 
 	go func() {
 		defer watcher.Close()
 
 		// we have to watch the entire directory to pick up renames/atomic saves in a cross-platform way
 		go func() {
+			defer close(done)
 			for {
 				select {
 				case event, ok := <-watcher.Events:
@@ -91,6 +99,8 @@ func (fb *FileBox) Watch(task func(err error)) error {
 						return
 					}
 					task(err)
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
@@ -100,11 +110,43 @@ func (fb *FileBox) Watch(task func(err error)) error {
 	return nil
 }
 
-func (fb *FileBox) UnWatch() {
-	fb.lock.Lock()
-	if fb.watchDone != nil {
-		close(fb.watchDone)
-		fb.watchDone = nil
+// URLBox
+type URLBox struct {
+	url, format string
+}
+
+func NewURLBox(url, format string) *URLBox {
+	return &URLBox{url, format}
+}
+
+func (ub *URLBox) Format() string {
+	if ub.format == "" {
+		return ext(ub.url)
 	}
-	defer fb.lock.Unlock()
+	return ub.format
+}
+
+func (ub *URLBox) Path() string {
+	return ub.url
+}
+
+func (ub *URLBox) Get() ([]byte, error) {
+	resp, err := http.Get(ub.url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
+}
+
+func (ub *URLBox) Set(data []byte) error {
+	return nil
+}
+
+func (ub *URLBox) Watch(task func(err error)) error {
+	return nil
+}
+
+func (ub *URLBox) WatchContext(ctx context.Context, task func(err error)) error {
+	return nil
 }

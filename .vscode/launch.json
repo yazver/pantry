@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Simple",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            //"remotePath": "",
+            //"port": 2345,
+            //"host": "127.0.0.1",
+            "program": "${workspaceRoot}/examples/simple",
+            //"env": {"TEST_AGE": "77",},
+            //"args": ["-age=100"],
+            "showLog": true,
+        },
+        {
+            "name": "Simple cmd help",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceRoot}/examples/simple",
+            "args": ["-h"],
+            "showLog": true,
+        }        
+    ]
+}
