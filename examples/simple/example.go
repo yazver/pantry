@@ -20,6 +20,7 @@ type Config struct {
 	DefaultAge     int  `default:"18"`
 	DescriptionTag bool `config:"flag:d" description:"This is description"`
 	ExpandedTags   bool `config.flag:"e|Expanded flag" config.env:"exp"`
+	PointerToInt   *int `default:"100"`
 	Cats           []string
 	Pi             float64
 	Perfection     []int
@@ -34,15 +35,21 @@ func main() {
 	p.Options.Enviropment.Prefix = "TEST_"
 	p.Options.Enviropment.Use = true
 
-	var config *Config = &Config{}
+	config := &Config{}
 
-	filePath, err := p.Load("config.toml", config)
+	box, err := p.Load("config.toml", config)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	filePath := box.Path()
 	fmt.Println("Config path: " + filePath)
 	//fmt.Printf("%#v", c)
-	spew.Dump(config)
-	p.Save(strings.Replace(filePath, ".toml", ".yaml", -1), config)
-	p.Save(strings.Replace(filePath, ".toml", ".json", -1), config)
+	scs := spew.ConfigState{Indent: "    ", DisableCapacities: true, DisablePointerAddresses: true}
+	scs.Dump(config)
+	if _, err := p.Save(strings.Replace(filePath, ".toml", ".yaml", -1), config); err != nil {
+		log.Fatalln(err)
+	}
+	if _, err := p.Save(strings.Replace(filePath, ".toml", ".json", -1), config); err != nil {
+		log.Fatalln(err)
+	}
 }

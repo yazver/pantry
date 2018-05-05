@@ -26,15 +26,44 @@ type FlagsUsing int
 
 const (
 	FlagsDontUse FlagsUsing = iota
-	FlagsUsePrediffenned
+	FlagsUsePredefined
 	FlagsUseAll
 )
 
 type Flags struct {
-	Using   FlagsUsing
-	FlagSet *flag.FlagSet
-	parsed  bool
-	values  map[string]interface{}
+	Using          FlagsUsing
+	FlagSet        *flag.FlagSet
+	Args           []string
+	ConfigPathFlag string
+	parsed         bool
+	values         map[string]interface{}
+}
+
+func (f *Flags) Init(flagSet *flag.FlagSet, arguments []string) {
+	if flagSet == nil {
+		f.FlagSet = flag.CommandLine
+	} else {
+		f.FlagSet = flagSet
+	}
+	if arguments == nil {
+		f.Args = os.Args[1:]
+	} else {
+		f.Args = arguments
+	}
+}
+
+func (f *Flags) GetConfigPath() string {
+	if f.ConfigPathFlag == "" {
+		return ""
+	}
+	fs := flag.NewFlagSet("", flag.ContinueOnError) // Temporary FlagSet
+	fs.Usage = func() {}                            // Prevent showing usage message
+	if flag := f.FlagSet.Lookup(f.ConfigPathFlag); flag == nil {
+		f.FlagSet.String(f.ConfigPathFlag, "", "Path to config file")
+	}
+	configPath := fs.String(f.ConfigPathFlag, "", "")
+	fs.Parse(f.Args) // Ingnore error
+	return *configPath
 }
 
 func (f *Flags) Add(v reflect.Value, name, usage string) error {
@@ -109,7 +138,7 @@ func (f *Flags) Get(dst reflect.Value, name string) (err error) {
 func (f *Flags) parse() error {
 	if !f.parsed {
 		f.values = map[string]interface{}{}
-		if err := f.FlagSet.Parse(os.Args[1:]); err != nil {
+		if err := f.FlagSet.Parse(f.Args); err != nil {
 			return err
 		}
 		f.FlagSet.Visit(func(fl *flag.Flag) {

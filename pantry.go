@@ -35,18 +35,6 @@ type Options struct {
 	DefaultFormat string
 }
 
-// Global options used for initiasation
-var DefaultOptions = &Options{
-	Flags:       Flags{Using: FlagsDontUse},
-	Enviropment: Enviropment{Use: true, Prefix: ""},
-	Tags: Tags{
-		Config:      Tag{true, "config"},
-		Default:     Tag{true, "default"},
-		Description: Tag{false, "description"},
-	},
-	DefaultFormat: "",
-}
-
 type Pantry struct {
 	Locations *Locations
 	Options   *Options
@@ -54,8 +42,17 @@ type Pantry struct {
 
 func (p *Pantry) Init(applicationName string, locations ...string) *Pantry {
 	p.Locations = NewLocations(applicationName, locations...)
-	p.Options = &Options{}
-	*p.Options = *DefaultOptions
+	p.Options = &Options{
+		Flags:       Flags{Using: FlagsDontUse},
+		Enviropment: Enviropment{Use: true, Prefix: ""},
+		Tags: Tags{
+			Config:      Tag{true, "config"},
+			Default:     Tag{true, "default"},
+			Description: Tag{false, "description"},
+		},
+		DefaultFormat: "",
+	}
+	p.Options.Flags.Init(nil, nil)
 	return p
 }
 
@@ -72,10 +69,16 @@ func (p *Pantry) AddLocations(locations ...string) {
 }
 
 func (p *Pantry) LocatePath(filename string) (string, error) {
+	if s := p.Options.Flags.GetConfigPath(); s != "" {
+		filename = s
+	}
 	return p.Locations.LocatePath(filename)
 }
 
 func (p *Pantry) Locate(filename string) (Box, error) {
+	if s := p.Options.Flags.GetConfigPath(); s != "" {
+		filename = s
+	}
 	return p.Locations.Locate(filename)
 }
 
@@ -112,7 +115,7 @@ func (p *Pantry) MarshalWith(v interface{}, marshaler MarshalFunc) (b []byte, er
 }
 
 func (p *Pantry) Unmarshal(b []byte, v interface{}, format string) error {
-	f, err := Formats.Search(format)
+	f, err := p.searchFormat(format)
 	if err != nil {
 		return err
 	}
@@ -120,7 +123,7 @@ func (p *Pantry) Unmarshal(b []byte, v interface{}, format string) error {
 }
 
 func (p *Pantry) Marshal(v interface{}, format string) (b []byte, err error) {
-	f, err := Formats.Search(format)
+	f, err := p.searchFormat(format)
 	if err != nil {
 		return nil, err
 	}
@@ -192,15 +195,7 @@ func (p *Pantry) Box(box Box, v interface{}) error {
 	return box.Set(b)
 }
 
-func (p *Pantry) Load(path string, v interface{}) (string, error) {
-	box, err := p.Locate(path)
-	if box == nil {
-		return "", err
-	}
-	return box.Path(), p.UnBox(box, v)
-}
-
-func (p *Pantry) LoadBox(path string, v interface{}) (Box, error) {
+func (p *Pantry) Load(path string, v interface{}) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
 		return nil, err
@@ -208,10 +203,10 @@ func (p *Pantry) LoadBox(path string, v interface{}) (Box, error) {
 	return box, p.UnBox(box, v)
 }
 
-func (p *Pantry) Save(path string, v interface{}) (string, error) {
+func (p *Pantry) Save(path string, v interface{}) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
-		return "", err
+		return nil, err
 	}
-	return box.Path(), p.Box(box, v)
+	return box, p.Box(box, v)
 }

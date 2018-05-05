@@ -3,6 +3,7 @@
     "DefaultAge": 18,
     "DescriptionTag": true,
     "ExpandedTags": true,
+    "PointerToInt": null,
     "Cats": [
         "Cauchy",
         "Plato"

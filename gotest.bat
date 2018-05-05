@@ -1,1 +1,0 @@
-gotests -all -w reflect.go
