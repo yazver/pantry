@@ -9,3 +9,5 @@
 bin/
 debug
 
+examples/simple/config.json
+examples/simple/config.yaml
