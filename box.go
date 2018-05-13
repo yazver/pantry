@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"context"
 	"net/http"
@@ -83,6 +84,10 @@ func (fb *FileBox) WatchContext(ctx context.Context, task func(err error)) error
 		// we have to watch the entire directory to pick up renames/atomic saves in a cross-platform way
 		go func() {
 			defer close(done)
+			ch := make(chan bool)
+			defer close(ch)
+			unjitterFunc(ch, time.Millisecond*500, func() { task(nil) })
+
 			for {
 				select {
 				case event, ok := <-watcher.Events:
@@ -91,7 +96,7 @@ func (fb *FileBox) WatchContext(ctx context.Context, task func(err error)) error
 					}
 					if filepath.Clean(event.Name) == filePath {
 						if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
-							task(nil)
+							ch <- true //task(nil)
 						}
 					}
 				case err, ok := <-watcher.Errors:

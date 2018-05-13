@@ -1,10 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yazver/pantry"
 )
@@ -15,11 +17,12 @@ type subConfig struct {
 }
 
 type config struct {
-	Age            int  `config:"flag:age|My age;env:AGE" default:"18" toml:"age"`
-	DefaultAge     int  `default:"18"`
-	DescriptionTag bool `config:"flag:d" description:"This is description"`
-	ExpandedTags   bool `config.flag:"e|Expanded flag" config.env:"exp"`
-	PointerToInt   *int `default:"100"`
+	Age            int   `config:"flag:age|My age;env:AGE" default:"18" toml:"age"`
+	DefaultAge     int   `default:"18"`
+	DescriptionTag bool  `config:"flag:d" description:"This is description"`
+	ExpandedTags   bool  `config.flag:"e|Expanded flag" config.env:"exp"`
+	PointerToInt   *int  `default:"100"`
+	PointerToUInt  *uint `config:"env:PTU"`
 	Cats           []string
 	Pi             float64
 	Perfection     []int
@@ -29,8 +32,12 @@ type config struct {
 }
 
 func main() {
+	os.Setenv("TEST_AGE", "25")
+	os.Setenv("TEST_PTU", "111")
+
 	p := pantry.NewPantry("Pantry", pantry.LocationConfigDir, pantry.LocationApplicationDir)
 	p.Options.Flags.Using = pantry.FlagsUseAll
+	p.Options.Flags.Args = []string{"-e"} // Only for test
 	p.Options.Enviropment.Prefix = "TEST_"
 	p.Options.Enviropment.Use = true
 
@@ -41,10 +48,10 @@ func main() {
 		log.Fatalln(err)
 	}
 	filePath := box.Path()
-	fmt.Println("Config path: " + filePath)
-	fmt.Printf("%#v", cfg)
-	// scs := spew.ConfigState{Indent: "    ", DisableCapacities: true, DisablePointerAddresses: true}
-	// scs.Dump(config)
+	//fmt.Println("Config path: " + filePath)
+	//fmt.Printf("%#v", cfg)
+	spew.Dump(cfg)
+
 	if _, err := p.Save(strings.Replace(filePath, ".toml", ".yaml", -1), cfg); err != nil {
 		log.Fatalln(err)
 	}

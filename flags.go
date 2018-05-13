@@ -110,7 +110,8 @@ func (f *Flags) Add(v reflect.Value, name, usage string) error {
 		case reflect.String:
 			f.FlagSet.String(name, v.String(), usage)
 		default:
-			return UnsupportedFlagTypeError{name, v.Type().Name()}
+			f.FlagSet.String(name, v.String(), usage)
+			// return UnsupportedFlagTypeError{name, v.Type().Name()}
 		}
 	}
 	//fo.flagSet.

@@ -8,35 +8,37 @@ import (
 	"github.com/yazver/pantry"
 )
 
-type SubConfig struct {
-	Weight int `default:"55"`
-	Height int
-}
-
-type Config struct {
+type config struct {
 	IP   net.IP `config:"flag:ip|IP address;env:IP" default:"0.0.0.0" toml:"ip"`
 	Port int16  `config:"flag:port|Port;env:PORT" default:"1080" toml:"port"`
 }
 
 func main() {
-	p := pantry.NewPantry("TestApp", pantry.LocationConfigDir, pantry.LocationApplicationDir)
+	p := pantry.NewPantry("testapp", pantry.LocationConfigDir, pantry.LocationApplicationDir)
 	p.Options.Flags.Using = pantry.FlagsUseAll
 
-	config := Config{}
+	cfg := config{}
 
-	filePath, err := p.Load("config.toml", &config)
+	box, err := p.Load("config.toml", &cfg)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println("Config path: " + filePath)
-	fmt.Printf("%#v", c)
-	//spew.Dump(config)
+	fmt.Println("Config path: " + box.Path())
+	fmt.Printf("%+v\n", cfg)
 
-	// 1
-	box, err := p.Load("config.toml", &config)
-	if err != nil {
+	done := make(chan struct{})
+	box.Watch(func(err error) {
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		fmt.Println("Config file changed.")
+		close(done)
+	})
+	if err := p.Box(box, cfg); err != nil {
 		log.Fatalln(err)
 	}
-	box.Watch(func(err error) { p.UnBox(box, &config) })
+	fmt.Println("Write config.")
 
+	<-done
 }
