@@ -5,7 +5,7 @@
 .git/
 .settings/
 .idea/
-.vscode
+.vscode/
 bin/
 debug
 
