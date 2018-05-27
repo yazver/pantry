@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -62,7 +61,7 @@ func (c ConfigFormats) Search(format string) (*ConfigFormat, error) {
 	format = strings.ToLower(format)
 	f, ok := c[format]
 	if !ok {
-		if f, ok = c[filepath.Ext(format)]; !ok {
+		if f, ok = c[ext(format)]; !ok {
 			return f, UnsupportedConfigError(format)
 		}
 	}

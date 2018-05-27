@@ -1,6 +1,7 @@
 package pantry
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 
@@ -13,6 +14,11 @@ import (
 //	ErrExist      = errors.New("file already exists")
 //	ErrNotExist   = errors.New("file does not exist")
 //)
+
+type Locker interface {
+	Lock()
+	Unlock()
+}
 
 // Tag options
 type Tag struct {
@@ -91,6 +97,11 @@ func (p *Pantry) searchFormat(s string) (*ConfigFormat, error) {
 }
 
 func (p *Pantry) UnmarshalWith(b []byte, v interface{}, unmarshaler UnmarshalFunc) error {
+	if l, ok := v.(Locker); ok {
+		l.Lock()
+		defer l.Unlock()
+	}
+
 	reflect.Clear(v)
 	if p.Options.Tags.Default.Use {
 		if err := unmarshaler(b, v); err != nil {
@@ -107,6 +118,11 @@ func (p *Pantry) UnmarshalWith(b []byte, v interface{}, unmarshaler UnmarshalFun
 }
 
 func (p *Pantry) MarshalWith(v interface{}, marshaler MarshalFunc) (b []byte, err error) {
+	if l, ok := v.(Locker); ok {
+		l.Lock()
+		defer l.Unlock()
+	}
+
 	b, err = marshaler(v)
 	if err != nil {
 		return nil, ConfigEncodeError{err}
@@ -184,23 +200,95 @@ func (p *Pantry) UnBox(box Box, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	return p.Unmarshal(b, v, box.Format())
+	return p.Unmarshal(b, v, box.Path())
 }
 
 func (p *Pantry) Box(box Box, v interface{}) error {
-	b, err := p.Marshal(v, box.Format())
+	b, err := p.Marshal(v, box.Path())
 	if err != nil {
 		return err
 	}
 	return box.Set(b)
 }
 
-func (p *Pantry) Load(path string, v interface{}) (Box, error) {
+func (p *Pantry) UnBoxWithFormat(box Box, v interface{}, format string) error {
+	b, err := box.Get()
+	if err != nil {
+		return err
+	}
+	if format == "" {
+		format = box.Path()
+	}
+	return p.Unmarshal(b, v, format)
+}
+
+func (p *Pantry) BoxWithFormat(box Box, v interface{}, format string) error {
+	if format == "" {
+		format = box.Path()
+	}
+	b, err := p.Marshal(v, format)
+	if err != nil {
+		return err
+	}
+	return box.Set(b)
+}
+
+// func (p *Pantry) Load(path string, v interface{}) (Box, error) {
+// 	box, err := p.Locate(path)
+// 	if box == nil {
+// 		return nil, err
+// 	}
+// 	return box, p.UnBox(box, v)
+// }
+
+func (p *Pantry) Load(path string, v interface{}, opt ...LoadOptions) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
 		return nil, err
 	}
-	return box, p.UnBox(box, v)
+
+	format := box.Path()
+	watchers := make([]Watcher, 0, len(opt))
+	ctx := context.Background()
+	reload := false
+	if len(opt) > 0 {
+		for _, o := range opt {
+			if o.Context != nil {
+				ctx = o.Context
+			}
+			if o.Format != "" {
+				format = o.Format
+			}
+			reload = reload || o.Reload
+			if o.Watcher != nil {
+				watchers = append(watchers, o.Watcher)
+			}
+		}
+
+	}
+
+	err = p.UnBoxWithFormat(box, v, format)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(watchers) > 0 || reload {
+		err := box.WatchContext(ctx, func(err error) {
+			if err == nil {
+				if reload {
+					err = p.UnBoxWithFormat(box, v, format)
+				}
+			}
+			for _, w := range watchers {
+				w(err)
+			}
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return box, nil
 }
 
 func (p *Pantry) Save(path string, v interface{}) (Box, error) {
@@ -209,4 +297,12 @@ func (p *Pantry) Save(path string, v interface{}) (Box, error) {
 		return nil, err
 	}
 	return box, p.Box(box, v)
+}
+
+func (p *Pantry) SaveWithFormat(path string, v interface{}, format string) (Box, error) {
+	box, err := p.Locate(path)
+	if box == nil {
+		return nil, err
+	}
+	return box, p.BoxWithFormat(box, v, format)
 }
