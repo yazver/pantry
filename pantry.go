@@ -15,25 +15,26 @@ import (
 //	ErrNotExist   = errors.New("file does not exist")
 //)
 
+// Locker interface is used for exlusive access to a variable if it realized.
 type Locker interface {
 	Lock()
 	Unlock()
 }
 
-// Tag options
+// Tag options.
 type Tag struct {
 	Use  bool   // Use tag
 	Name string // Name of tag
 }
 
-// Tags options
+// Tags options.
 type Tags struct {
 	Default     Tag
 	Config      Tag
 	Description Tag
 }
 
-// Config processing options
+// Config processing options.
 type Options struct {
 	Flags         Flags
 	Enviropment   Enviropment
@@ -41,11 +42,13 @@ type Options struct {
 	DefaultFormat string
 }
 
+// Pantry is used to load config data from different sources.
 type Pantry struct {
 	Locations *Locations
 	Options   *Options
 }
 
+// Init Pantry.
 func (p *Pantry) Init(applicationName string, locations ...string) *Pantry {
 	p.Locations = NewLocations(applicationName, locations...)
 	p.Options = &Options{
@@ -62,18 +65,22 @@ func (p *Pantry) Init(applicationName string, locations ...string) *Pantry {
 	return p
 }
 
+// NewPantry creates new Pantry.
 func NewPantry(applicationName string, locations ...string) *Pantry {
 	return new(Pantry).Init(applicationName, locations...)
 }
 
+// AddLocation adds searching location.
 func (p *Pantry) AddLocation(locationParts ...string) {
 	p.Locations.AddJoin(locationParts...)
 }
 
+// AddLocations adds searching locations.
 func (p *Pantry) AddLocations(locations ...string) {
 	p.Locations.Add(locations...)
 }
 
+// LocatePath looks for the file in previously added locations.
 func (p *Pantry) LocatePath(filename string) (string, error) {
 	if s := p.Options.Flags.GetConfigPath(); s != "" {
 		filename = s
@@ -81,6 +88,7 @@ func (p *Pantry) LocatePath(filename string) (string, error) {
 	return p.Locations.LocatePath(filename)
 }
 
+// Locate looks for the file in previously added locations.
 func (p *Pantry) Locate(filename string) (Box, error) {
 	if s := p.Options.Flags.GetConfigPath(); s != "" {
 		filename = s
@@ -96,6 +104,7 @@ func (p *Pantry) searchFormat(s string) (*ConfigFormat, error) {
 	return f, err
 }
 
+// UnmarshalWith unmarshals data by "unmarshaler" and applays enviropment variables and command line flags.
 func (p *Pantry) UnmarshalWith(b []byte, v interface{}, unmarshaler UnmarshalFunc) error {
 	if l, ok := v.(Locker); ok {
 		l.Lock()
@@ -130,6 +139,7 @@ func (p *Pantry) MarshalWith(v interface{}, marshaler MarshalFunc) (b []byte, er
 	return
 }
 
+// Unmarshal unmarshals data as diffened format and applays enviropment variables and command line flags.
 func (p *Pantry) Unmarshal(b []byte, v interface{}, format string) error {
 	f, err := p.searchFormat(format)
 	if err != nil {
@@ -233,14 +243,6 @@ func (p *Pantry) BoxWithFormat(box Box, v interface{}, format string) error {
 	return box.Set(b)
 }
 
-// func (p *Pantry) Load(path string, v interface{}) (Box, error) {
-// 	box, err := p.Locate(path)
-// 	if box == nil {
-// 		return nil, err
-// 	}
-// 	return box, p.UnBox(box, v)
-// }
-
 func (p *Pantry) Load(path string, v interface{}, opt ...LoadOptions) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
@@ -299,7 +301,7 @@ func (p *Pantry) Save(path string, v interface{}) (Box, error) {
 	return box, p.Box(box, v)
 }
 
-func (p *Pantry) SaveWithFormat(path string, v interface{}, format string) (Box, error) {
+func (p *Pantry) SaveAs(path string, v interface{}, format string) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
 		return nil, err

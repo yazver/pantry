@@ -19,23 +19,6 @@ func main() {
 
 	cfg := config{}
 
-	// box, err := p.Load("config.toml", &cfg)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	// fmt.Println("Config path: " + box.Path())
-	// fmt.Printf("%+v\n", cfg)
-
-	// done := make(chan struct{})
-	// box.Watch(func(err error) {
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 		return
-	// 	}
-	// 	fmt.Println("Config file changed.")
-	// 	close(done)
-	// })
-
 	done := make(chan struct{})
 	box, err := p.Load("config.toml", &cfg, pantry.Watch(func(err error) {
 		if err != nil {
@@ -51,6 +34,7 @@ func main() {
 	fmt.Println("Config path: " + box.Path())
 	fmt.Printf("%+v\n", cfg)
 
+	// Update file
 	if err := p.Box(box, cfg); err != nil {
 		log.Fatalln(err)
 	}

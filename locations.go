@@ -12,6 +12,7 @@ const (
 	LocationConfigDir      = "${configdir}"
 	LocationApplicationDir = "${appdir}"
 	LocationCurrentDir     = "${curdir}"
+	LocationHomeDir        = "${home}"
 )
 
 // UnfoundLocation denotes that location is not found.
@@ -48,6 +49,9 @@ func (l *Locations) Init(applicationName string, locations ...string) *Locations
 	if path, err := os.Getwd(); err == nil {
 		l.baseLocations[LocationCurrentDir] = path
 	}
+	if path, err := getHomeDir(); err == nil {
+		l.baseLocations[LocationHomeDir] = path
+	}
 
 	l.ApplicationName = applicationName
 	l.Add(locations...)
@@ -71,6 +75,12 @@ func (l *Locations) ExpandLocation(path string) string {
 	// 	}
 
 	// }
+	if len(path) >= 2 && path[:2] == "./" {
+		path = filepath.Join(LocationCurrentDir, path[2:])
+	}
+	if len(path) >= 2 && path[:2] == "~/" {
+		path = filepath.Join(LocationHomeDir, path[2:])
+	}
 	path = os.Expand(filepath.FromSlash(path), func(key string) string {
 		return l.baseLocations["${"+key+"}"]
 	})

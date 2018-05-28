@@ -15,7 +15,6 @@ import (
 // Box
 type Box interface {
 	Path() string
-	Format() string
 	Get() ([]byte, error)
 	Set(data []byte) error
 	Watch(task func(err error)) error
@@ -24,14 +23,6 @@ type Box interface {
 
 type BaseBox struct {
 	path string
-}
-
-// Format returns the file name extension used by path.
-// The extension is the suffix beginning after the final dot
-// in the final slash-separated element of path;
-// it is empty if there is no dot.
-func (bb *BaseBox) Format() string {
-	return ext(bb.path)
 }
 
 func (bb *BaseBox) Path() string {
