@@ -8,8 +8,9 @@ import (
 )
 
 type Enviropment struct {
-	Use    bool
-	Prefix string
+	Use            bool
+	Prefix         string
+	Hierarchically bool
 }
 
 func (e *Enviropment) Get(v reflect.Value, name string) (err error) {

@@ -17,12 +17,12 @@ type subConfig struct {
 }
 
 type config struct {
-	Age            int   `config:"flag:age|My age;env:AGE" default:"18" toml:"age"`
+	Age            int   `pantry:"flag:age|My age;env:AGE" default:"18" toml:"age"`
 	DefaultAge     int   `default:"18"`
-	DescriptionTag bool  `config:"flag:d" description:"This is description"`
-	ExpandedTags   bool  `config.flag:"e|Expanded flag" config.env:"exp"`
+	DescriptionTag bool  `pantry:"flag:d" description:"This is description"`
+	ExpandedTags   bool  `pantry.flag:"e|Expanded flag" pantry.env:"exp"`
 	PointerToInt   *int  `default:"100"`
-	PointerToUInt  *uint `config:"env:PTU"`
+	PointerToUInt  *uint `pantry:"env:PTU"`
 	Cats           []string
 	Pi             float64
 	Perfection     []int

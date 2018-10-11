@@ -9,8 +9,8 @@ import (
 )
 
 type config struct {
-	IP   net.IP `config:"flag:ip|IP address;env:IP" default:"0.0.0.0" toml:"ip"`
-	Port int16  `config:"flag:port|Port;env:PORT" default:"1080" toml:"port"`
+	IP   net.IP `pantry:"flag:ip|IP address;env:IP" default:"0.0.0.0" toml:"ip"`
+	Port int16  `pantry:"flag:port|Port;env:PORT" default:"1080" toml:"port"`
 }
 
 func main() {

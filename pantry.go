@@ -29,8 +29,10 @@ type Tag struct {
 
 // Tags options.
 type Tags struct {
-	Default     Tag
 	Config      Tag
+	Flag        Tag
+	Env         Tag
+	Default     Tag
 	Description Tag
 }
 
@@ -55,9 +57,11 @@ func (p *Pantry) Init(applicationName string, locations ...string) *Pantry {
 		Flags:       Flags{Using: FlagsDontUse},
 		Enviropment: Enviropment{Use: true, Prefix: ""},
 		Tags: Tags{
-			Config:      Tag{true, "config"},
+			Config:      Tag{true, "pantry"},
+			Flag:        Tag{true, "flag"},
+			Env:         Tag{true, "env"},
 			Default:     Tag{true, "default"},
-			Description: Tag{false, "description"},
+			Description: Tag{false, "desc"},
 		},
 		DefaultFormat: "",
 	}
@@ -221,7 +225,7 @@ func (p *Pantry) Box(box Box, v interface{}) error {
 	return box.Set(b)
 }
 
-func (p *Pantry) UnBoxWithFormat(box Box, v interface{}, format string) error {
+func (p *Pantry) UnBoxAs(box Box, v interface{}, format string) error {
 	b, err := box.Get()
 	if err != nil {
 		return err
@@ -232,7 +236,7 @@ func (p *Pantry) UnBoxWithFormat(box Box, v interface{}, format string) error {
 	return p.Unmarshal(b, v, format)
 }
 
-func (p *Pantry) BoxWithFormat(box Box, v interface{}, format string) error {
+func (p *Pantry) BoxAs(box Box, v interface{}, format string) error {
 	if format == "" {
 		format = box.Path()
 	}
@@ -243,46 +247,31 @@ func (p *Pantry) BoxWithFormat(box Box, v interface{}, format string) error {
 	return box.Set(b)
 }
 
-func (p *Pantry) Load(path string, v interface{}, opt ...LoadOptions) (Box, error) {
+func (p *Pantry) LoadAs(path string, v interface{}, format string, opts ...func(*LoadOptions)) (Box, error) {
 	box, err := p.Locate(path)
 	if box == nil {
 		return nil, err
 	}
 
-	format := box.Path()
-	watchers := make([]Watcher, 0, len(opt))
-	ctx := context.Background()
-	reload := false
-	if len(opt) > 0 {
-		for _, o := range opt {
-			if o.Context != nil {
-				ctx = o.Context
-			}
-			if o.Format != "" {
-				format = o.Format
-			}
-			reload = reload || o.Reload
-			if o.Watcher != nil {
-				watchers = append(watchers, o.Watcher)
-			}
-		}
-
+	lo := LoadOptions{Context: context.Background()}
+	for _, opt := range opts {
+		opt(&lo)
 	}
 
-	err = p.UnBoxWithFormat(box, v, format)
+	err = p.UnBoxAs(box, v, format)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(watchers) > 0 || reload {
-		err := box.WatchContext(ctx, func(err error) {
+	if lo.Watcher != nil || lo.Reload {
+		err := box.WatchContext(lo.Context, func(err error) {
 			if err == nil {
-				if reload {
-					err = p.UnBoxWithFormat(box, v, format)
+				if lo.Reload {
+					err = p.UnBoxAs(box, v, format)
 				}
 			}
-			for _, w := range watchers {
-				w(err)
+			for lo.Watcher != nil {
+				lo.Watcher(err)
 			}
 		})
 		if err != nil {
@@ -291,6 +280,10 @@ func (p *Pantry) Load(path string, v interface{}, opt ...LoadOptions) (Box, erro
 	}
 
 	return box, nil
+}
+
+func (p *Pantry) Load(path string, v interface{}, opt ...func(*LoadOptions)) (Box, error) {
+	return p.LoadAs(path, v, "", opt...)
 }
 
 func (p *Pantry) Save(path string, v interface{}) (Box, error) {
@@ -306,5 +299,5 @@ func (p *Pantry) SaveAs(path string, v interface{}, format string) (Box, error) 
 	if box == nil {
 		return nil, err
 	}
-	return box, p.BoxWithFormat(box, v, format)
+	return box, p.BoxAs(box, v, format)
 }

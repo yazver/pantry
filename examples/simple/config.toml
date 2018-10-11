@@ -1,6 +1,6 @@
 Age = 25
 DescriptionTag = true
-ExpandedTags = true
+ExpandedTags = false
 Cats = [ "Cauchy", "Plato" ]
 Pi = 3.14
 Perfection = [ 6, 28, 496, 8128 ]

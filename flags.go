@@ -1,13 +1,12 @@
 package pantry
 
 import (
-	"encoding"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"reflect"
-	"time"
+	"strings"
 
 	ref "github.com/yazver/golibs/reflect"
 )
@@ -20,6 +19,16 @@ type UnsupportedFlagTypeError struct {
 // Returns the formatted configuration error.
 func (e UnsupportedFlagTypeError) Error() string {
 	return fmt.Sprintf("Unsupported type of flag \"%s\": %s", e.name, e.flagType)
+}
+
+type Flag struct {
+	Name     string // name as it appears on command line
+	Short    string // optional short name
+	Usage    string // help message
+	DefValue string // default value (as text); for usage message
+	//Type     reflect.Type
+	Value reflect.Value
+	//actual   bool
 }
 
 type FlagsUsing int
@@ -35,118 +44,130 @@ type Flags struct {
 	FlagSet        *flag.FlagSet
 	Args           []string
 	ConfigPathFlag string
+	Hierarchically bool
 	parsed         bool
-	values         map[string]interface{}
+	values         []*Flag
 }
 
-func (f *Flags) Init(flagSet *flag.FlagSet, arguments []string) {
+func (flags *Flags) Init(flagSet *flag.FlagSet, arguments []string) {
 	if flagSet == nil {
-		f.FlagSet = flag.CommandLine
+		flags.FlagSet = flag.CommandLine
 	} else {
-		f.FlagSet = flagSet
+		flags.FlagSet = flagSet
 	}
 	if arguments == nil {
-		f.Args = os.Args[1:]
+		flags.Args = os.Args[1:]
 	} else {
-		f.Args = arguments
+		flags.Args = arguments
 	}
 }
 
-func (f *Flags) GetConfigPath() string {
-	if f.ConfigPathFlag == "" {
+func (flags *Flags) GetConfigPath() string {
+	if flags.ConfigPathFlag == "" {
 		return ""
 	}
 	fs := flag.NewFlagSet("", flag.ContinueOnError) // Temporary FlagSet
 	fs.Usage = func() {}                            // Prevent showing usage message
-	if flag := f.FlagSet.Lookup(f.ConfigPathFlag); flag == nil {
-		f.FlagSet.String(f.ConfigPathFlag, "", "Path to config file")
+	if flag := flags.FlagSet.Lookup(flags.ConfigPathFlag); flag == nil {
+		flags.FlagSet.String(flags.ConfigPathFlag, "", "Path to config file")
 	}
-	configPath := fs.String(f.ConfigPathFlag, "", "")
-	fs.Parse(f.Args) // Ingnore error
+	configPath := fs.String(flags.ConfigPathFlag, "", "")
+	_ = fs.Parse(flags.Args) // Ingnore error
 	return *configPath
 }
 
-func (f *Flags) Add(v reflect.Value, name, usage string) error {
-	if f.FlagSet == nil {
-		f.FlagSet = flag.CommandLine
+func (flags *Flags) Add(f *Flag) error {
+	// if flags.values == nil {
+	// 	flags.flags = []*Flag{}
+	// }
+	if flags.FlagSet == nil {
+		flags.FlagSet = flag.CommandLine
 	}
 
-	if name == "" {
+	if f.Name == "" {
 		return errors.New("Undefined flag name")
 	}
 
-	if f.Using == FlagsUseAll && f.FlagSet.Lookup(name) == nil {
-		f.parsed = false
+	if flags.Using == FlagsUseAll && flags.FlagSet.Lookup(f.Name) == nil {
+		flags.parsed = false
 
-		if v.CanInterface() {
-			switch value := v.Interface().(type) {
-			case time.Duration:
-				f.FlagSet.Duration(name, value, usage)
-				return nil
-			case encoding.TextUnmarshaler:
-				if m, ok := value.(encoding.TextMarshaler); ok {
-					b, err := m.MarshalText()
-					if err != nil {
-						return fmt.Errorf("Unable to assign default value (%#v) to flag (%s): %s", value, name, err)
-					}
-					f.FlagSet.String(name, string(b), usage)
-					return nil
+		t := f.Value.Type()
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		v := reflect.Value{}
+		switch t.Kind() {
+		case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int,
+			reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint,
+			reflect.Float32, reflect.Float64, reflect.Bool:
+			v = reflect.New(t).Elem()
+			defValue := strings.TrimSpace(f.DefValue)
+			if defValue != "" {
+				if err := ref.AssignStringToValue(v, defValue); err != nil {
+					return fmt.Errorf("Can't convert default value \"%s\" to type \"%s\": %s", defValue, t.Name, err)
+				}
+			}
+		}	
+
+		switch t.Kind() {
+		case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			flags.FlagSet.Int64(f.Name, v.Int(), f.Usage)
+		case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			flags.FlagSet.Uint64(f.Name, v.Uint(), f.Usage)
+		case reflect.Int:
+			flags.FlagSet.Int(f.Name, int(v.Int()), f.Usage)
+		case reflect.Uint:
+			flags.FlagSet.Uint(f.Name, uint(v.Uint()), f.Usage)
+		case reflect.Float32, reflect.Float64:
+			flags.FlagSet.Float64(f.Name, v.Float(), f.Usage)
+		case reflect.Bool:
+			flags.FlagSet.Bool(f.Name, v.Bool(), f.Usage)
+		default:
+			flags.FlagSet.String(f.Name, f.DefValue, f.Usage)
+		}
+	}
+	flags.values = append(flags.values, f)
+	return nil
+}
+
+// func (flags *Flags) Get(dst reflect.Value, name string) (err error) {
+// 	if flags.Using == FlagsDontUse {
+// 		return nil
+// 	}
+// 	if !flags.parsed {
+// 		if err = flags.parse(); err != nil {
+// 			return
+// 		}
+// 	}
+// 	if f, ok := flags.flags[name]; ok {
+// 		if f.actual {
+// 			if err = ref.AssignValue(dst, f.value); err != nil {
+// 			return fmt.Errorf("Unsupported type of field \"%s\": %s; Error: %s", name, dst.Type().Name(), err)
+// 		}
+// 	}
+// 	}
+// 	return nil
+// }
+
+func (flags *Flags) Process() error {
+	if !flags.parsed {
+		if err := flags.FlagSet.Parse(flags.Args); err != nil {
+			return err
+		}
+		values := map[string]reflect.Value{}
+		flags.FlagSet.Visit(func(fl *flag.Flag) {
+			if getter, ok := fl.Value.(flag.Getter); ok {
+				values[fl.Name] = reflect.ValueOf(getter.Get())
+			}
+		})
+		for _, value := range flags.values {
+			if v, ok := values[value.Name]; ok {
+				if err := ref.AssignValue(value.Value, v); err != nil {
+					return errors.New("Can't assign flag to value: " + err.Error())
 				}
 			}
 		}
-		switch v.Kind() {
-		case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			f.FlagSet.Int64(name, v.Int(), usage)
-		case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			f.FlagSet.Uint64(name, v.Uint(), usage)
-		case reflect.Int:
-			f.FlagSet.Int(name, int(v.Int()), usage)
-		case reflect.Uint:
-			f.FlagSet.Uint(name, uint(v.Uint()), usage)
-		case reflect.Float32, reflect.Float64:
-			f.FlagSet.Float64(name, v.Float(), usage)
-		case reflect.Bool:
-			f.FlagSet.Bool(name, v.Bool(), usage)
-		case reflect.String:
-			f.FlagSet.String(name, v.String(), usage)
-		default:
-			f.FlagSet.String(name, v.String(), usage)
-			// return UnsupportedFlagTypeError{name, v.Type().Name()}
-		}
-	}
-	//fo.flagSet.
-	return nil
-}
 
-func (f *Flags) Get(dst reflect.Value, name string) (err error) {
-	if f.Using == FlagsDontUse {
-		return nil
-	}
-	if !f.parsed {
-		if err = f.parse(); err != nil {
-			return
-		}
-	}
-	if value, ok := f.values[name]; ok {
-		src := reflect.ValueOf(value)
-		if err = ref.AssignValue(dst, src); err != nil {
-			return fmt.Errorf("Unsupported type of field \"%s\": %s; Error: %s", name, dst.Type().Name(), err)
-		}
-	}
-	return nil
-}
-
-func (f *Flags) parse() error {
-	if !f.parsed {
-		f.values = map[string]interface{}{}
-		if err := f.FlagSet.Parse(f.Args); err != nil {
-			return err
-		}
-		f.FlagSet.Visit(func(fl *flag.Flag) {
-			if getter, ok := fl.Value.(flag.Getter); ok {
-				f.values[fl.Name] = getter.Get()
-			}
-		})
 	}
 	return nil
 }

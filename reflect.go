@@ -14,7 +14,7 @@ var (
 	errValueIsNotEditable = errors.New("Invalid value, should be editable")
 )
 
-type processField func(value reflect.Value, name string, tag reflect.StructTag) error
+type processField func(value reflect.Value, name string, tag reflect.StructTag, state *ref.State) error
 
 func traverseStruct(v interface{}, process processField) error {
 	value := reflect.ValueOf(v)
@@ -35,7 +35,7 @@ func traverseStruct(v interface{}, process processField) error {
 }
 
 func traverseStructValue(v reflect.Value, process processField) error {
-	return ref.TraverseValueFields(v, func(value reflect.Value, path string, level uint, field *reflect.StructField) error {
-		return process(value, field.Name, field.Tag)
+	return ref.TraverseValueFields(v, func(value reflect.Value, state *ref.State, field *reflect.StructField) error {
+		return process(value, field.Name, field.Tag, state)
 	})
 }

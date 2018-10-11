@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -83,6 +84,36 @@ func getAppConfigDir(appName string) (dir string, err error) {
 
 func getAppDir() (string, error) {
 	return filepath.Abs(filepath.Dir(os.Args[0]))
+}
+
+func splitTo(s, sep string, parts ...*string) {
+	ss := strings.Split(s, sep)
+	for i := 0; i < len(parts) && i < len(ss); i++ {
+		*(parts[i]) = ss[i]
+	}
+	for i := len(ss); i < len(parts); i++ {
+		*(parts[i]) = ""
+	}
+}
+
+func splitNTo(s, sep string, parts ...*string) {
+	ss := strings.SplitN(s, sep, len(parts))
+	for i := 0; i < len(parts) && i < len(ss); i++ {
+		*(parts[i]) = ss[i]
+	}
+	for i := len(ss); i < len(parts); i++ {
+		*(parts[i]) = ""
+	}
+}
+
+func fieldsTo(s string, parts ...*string) {
+	ss := strings.Fields(s)
+	for i := 0; i < len(parts) && i < len(ss); i++ {
+		*(parts[i]) = ss[i]
+	}
+	for i := len(ss); i < len(parts); i++ {
+		*(parts[i]) = ""
+	}
 }
 
 // accumulate signals
